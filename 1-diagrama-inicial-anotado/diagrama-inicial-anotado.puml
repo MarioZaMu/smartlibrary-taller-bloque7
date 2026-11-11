@@ -1,0 +1,123 @@
+@startuml diagrama-inicial-anotado
+' ===== Entregable 1: Diagrama inicial anotado (modelo OO de partida) =====
+!pragma layout smetana
+title Modelo de clases inicial de SmartLibrary — con observaciones
+hide circle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam dpi 130
+skinparam classAttributeIconSize 0
+skinparam ClassBackgroundColor #FFFFCC
+skinparam ClassHeaderBackgroundColor #FFFFCC
+skinparam ClassBorderColor #2B2B2B
+skinparam ClassBorderThickness 1.3
+skinparam ArrowColor #2B2B2B
+skinparam NoteBackgroundColor #E6F0FA
+skinparam NoteBorderColor #4A6FA5
+skinparam NoteFontSize 11
+skinparam NoteFontColor #1A1A1A
+
+class GestorPrestamos {
+  - estudiantes: List<Estudiante>
+  - libros: List<Libro>
+  - prestamos: List<Prestamo>
+  --
+  + GestorPrestamos()
+  + registrarPrestamo(e: Estudiante, l: Libro): Prestamo
+  + getEstudiantes(): List<Estudiante>
+  + setEstudiantes(lista): void
+  + getLibros(): List<Libro>
+  + setLibros(lista): void
+  + getPrestamos(): List<Prestamo>
+  + setPrestamos(lista): void
+}
+
+class Estudiante {
+  - id: Long
+  - nombre: String
+  - correo: String
+  --
+  + Estudiante(id, nombre, correo)
+  + getId(): Long
+  + setId(id): void
+  + getNombre(): String
+  + setNombre(nombre): void
+  + getCorreo(): String
+  + setCorreo(correo): void
+}
+
+class Libro {
+  - id: Long
+  - titulo: String
+  - disponible: boolean
+  --
+  + Libro(id, titulo, disponible)
+  + getId(): Long
+  + setId(id): void
+  + getTitulo(): String
+  + setTitulo(titulo): void
+  + isDisponible(): boolean
+  + setDisponible(valor): void
+  + marcarPrestado(): void
+}
+
+class Prestamo {
+  - id: Long
+  - fechaPrestamo: LocalDate
+  - fechaDevolucion: LocalDate [0..1]
+  - estudiante: Estudiante
+  - libro: Libro
+  --
+  + Prestamo(id, fecha, estudiante, libro)
+  + getId(): Long
+  + setId(id): void
+  + getFechaPrestamo(): LocalDate
+  + setFechaPrestamo(fecha): void
+  + getFechaDevolucion(): LocalDate
+  + setFechaDevolucion(fecha): void
+  + getEstudiante(): Estudiante
+  + setEstudiante(estudiante): void
+  + getLibro(): Libro
+  + setLibro(libro): void
+}
+
+GestorPrestamos "1" --> "0..*" Estudiante : registra
+GestorPrestamos "1" --> "0..*" Libro : administra
+GestorPrestamos "1" --> "0..*" Prestamo : gestiona
+Prestamo "0..*" --> "1" Estudiante : estudiante
+Prestamo "0..*" --> "1" Libro : libro
+
+note top of Estudiante
+  **(A) Dominio.** Estudiante, Libro y Prestamo son el modelo del
+  dominio: datos propios (id, nombre, correo, titulo, disponible,
+  fechas) y comportamiento propio (isDisponible, marcarPrestado,
+  accesores). No son una cuarta capa de ejecución.
+end note
+
+note bottom of Libro
+  **(B) ¿Asociación y no composición?** Libro y Estudiante existen
+  antes que cualquier Prestamo y siguen existiendo si el préstamo se
+  elimina: ciclo de vida **independiente**. Un Libro tiene varios
+  préstamos históricos (R5) y un Estudiante también (0..*), así que
+  ninguno es "parte exclusiva" de otro. Solo hay una relación
+  estructural (Prestamo guarda una referencia): asociación simple,
+  sin rombos.
+end note
+
+note left of GestorPrestamos
+  **(C) Clase mixta.** GestorPrestamos no es dominio:
+  mezcla coordinación del caso de uso (registrarPrestamo),
+  almacenamiento (las tres listas) y la regla R1 sin dueño claro.
+  Sus responsabilidades se reparten en el rediseño.
+  **Faltan para recibir HTTP:** un punto de entrada que reciba
+  POST /api/prestamos, un objeto de entrada (PrestamoRequest) con
+  validación, y quien traduzca el resultado y los errores a
+  201 / 400 / 404 / 409.
+  **Faltan para acceder a datos:** operaciones de consulta
+  (buscar por id, listar), de guardado y una transacción;
+  hoy las listas en memoria no persisten nada.
+end note
+
+@enduml
