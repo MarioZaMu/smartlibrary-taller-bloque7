@@ -1,0 +1,73 @@
+=== 0. Consulta inicial de préstamos -> 200 OK con registros (dato inicial) ===
+$ curl http://localhost:8080/api/prestamos
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+[{"id":1,"estudianteId":2,"libroId":3,"fechaPrestamo":"2026-11-01"}]
+
+=== 1. Préstamo de libro disponible (estudiante 1, libro 1) -> 201 Created ===
+$ curl -X POST http://localhost:8080/api/prestamos -H Content-Type: application/json -d {"estudianteId":1,"libroId":1}
+HTTP/1.1 201 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+{"id":2,"estudianteId":1,"libroId":1,"fechaPrestamo":"2026-11-11"}
+
+=== 2. Mismo libro otra vez (estudiante 2, libro 1) -> 409 Conflict ===
+$ curl -X POST http://localhost:8080/api/prestamos -H Content-Type: application/json -d {"estudianteId":2,"libroId":1}
+HTTP/1.1 409 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+{"estado":409,"mensaje":"El libro con id 1 no está disponible para préstamo"}
+
+=== 3. Libro ya prestado en los datos iniciales (libro 3) -> 409 Conflict ===
+$ curl -X POST http://localhost:8080/api/prestamos -H Content-Type: application/json -d {"estudianteId":1,"libroId":3}
+HTTP/1.1 409 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+{"estado":409,"mensaje":"El libro con id 3 no está disponible para préstamo"}
+
+=== 4. Estudiante inexistente (id 999) -> 404 Not Found ===
+$ curl -X POST http://localhost:8080/api/prestamos -H Content-Type: application/json -d {"estudianteId":999,"libroId":2}
+HTTP/1.1 404 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+{"estado":404,"mensaje":"No existe un estudiante con id 999"}
+
+=== 5. Libro inexistente (id 999) -> 404 Not Found ===
+$ curl -X POST http://localhost:8080/api/prestamos -H Content-Type: application/json -d {"estudianteId":1,"libroId":999}
+HTTP/1.1 404 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+{"estado":404,"mensaje":"No existe un libro con id 999"}
+
+=== 6. Solicitud inválida (sin ids) -> 400 Bad Request ===
+$ curl -X POST http://localhost:8080/api/prestamos -H Content-Type: application/json -d {}
+HTTP/1.1 400 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+Connection: close
+
+{"estado":400,"mensaje":"estudianteId es obligatorio; libroId es obligatorio"}
+
+=== 7. Consulta final de préstamos -> 200 OK: solo 2 registros (409/404/400 no crearon préstamos) ===
+$ curl http://localhost:8080/api/prestamos
+HTTP/1.1 200 
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 11 Nov 2026 21:47:13 GMT
+
+[{"id":1,"estudianteId":2,"libroId":3,"fechaPrestamo":"2026-11-01"},{"id":2,"estudianteId":1,"libroId":1,"fechaPrestamo":"2026-11-11"}]
+
