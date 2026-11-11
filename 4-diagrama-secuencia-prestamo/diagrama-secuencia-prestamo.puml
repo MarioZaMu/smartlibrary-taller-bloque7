@@ -1,0 +1,85 @@
+@startuml diagrama-secuencia-prestamo
+' ===== Entregable 4: Diagrama de secuencia de POST /api/prestamos =====
+title SmartLibrary — Secuencia de POST /api/prestamos\n(préstamo exitoso / libro no disponible)
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam dpi 130
+skinparam SequenceMessageAlign left
+skinparam ParticipantBackgroundColor #FFFFCC
+skinparam ParticipantBorderColor #2B2B2B
+skinparam ActorBackgroundColor #FFFFCC
+skinparam ActorBorderColor #2B2B2B
+skinparam SequenceLifeLineBorderColor #555555
+skinparam SequenceLifeLineBackgroundColor #FFFFFF
+skinparam ArrowColor #2B2B2B
+skinparam SequenceGroupBackgroundColor #FFFFFF
+skinparam SequenceGroupBorderColor #2B2B2B
+skinparam NoteBackgroundColor #E6F0FA
+skinparam NoteBorderColor #4A6FA5
+skinparam NoteFontSize 11
+
+actor Usuario
+participant ":PrestamoController" as C <<RestController>>
+participant ":ManejadorExcepciones" as M <<RestControllerAdvice>>
+participant ":PrestamoService" as S <<Service>>
+participant ":EstudianteRepository" as ER <<interface>>
+participant ":LibroRepository" as LR <<interface>>
+participant ":PrestamoRepository" as PR <<interface>>
+participant "libro:Libro" as L <<Entity>>
+
+Usuario -> C : POST /api/prestamos\nregistrar(request: PrestamoRequest)
+activate C
+C -> S : registrarPrestamo(request)
+activate S
+note right of S : @Transactional: inicia la transacción
+S -> ER : findById(request.estudianteId)
+activate ER
+ER --> S : Optional<Estudiante>
+deactivate ER
+S -> LR : findById(request.libroId)
+activate LR
+LR --> S : Optional<Libro>
+deactivate LR
+S -> L : isDisponible()
+activate L
+L --> S : disponible: boolean
+deactivate L
+
+alt libro disponible  [R1]
+  create "p:Prestamo" as P <<Entity>>
+  S -> P : Prestamo(estudiante, libro, fechaPrestamo)
+  S -> L : marcarPrestado()   [R3]
+  activate L
+  deactivate L
+  S -> LR : save(libro)
+  activate LR
+  LR --> S : Libro
+  deactivate LR
+  S -> PR : save(prestamo)   [R2]
+  activate PR
+  PR --> S : Prestamo
+  deactivate PR
+  note right of S : commit de la transacción
+  S --> C : Prestamo
+  deactivate S
+  C --> Usuario : 201 Created\nPrestamoResponse.desde(prestamo)
+else libro no disponible
+  note right of S : rollback: no se guarda ningún préstamo  [R4]
+  S --> M : throw LibroNoDisponibleException(id)
+  deactivate S
+  activate M
+  M --> Usuario : 409 Conflict\nmanejarNoDisponible(ex): ErrorRespuesta
+  deactivate M
+end
+deactivate C
+
+note over S, PR
+  Si el estudiante o el libro no existen, el servicio lanza
+  EstudianteNoEncontradoException / LibroNoEncontradoException
+  y ManejadorExcepciones responde 404 Not Found (manejarNoEncontrado).
+  Una solicitud inválida (ids nulos) responde 400 (manejarValidacion).
+end note
+@enduml
