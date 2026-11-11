@@ -1,0 +1,193 @@
+@startuml diagrama-clases-capas
+' ===== Entregable 3: Diagrama de clases por capas (Controller -> Service -> Repository) =====
+!pragma layout smetana
+title SmartLibrary — Diagrama de clases por tres capas (POST /api/prestamos)
+hide circle
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam dpi 120
+skinparam classAttributeIconSize 0
+skinparam ClassBackgroundColor #FFFFCC
+skinparam ClassHeaderBackgroundColor #FFFFCC
+skinparam ClassBorderColor #2B2B2B
+skinparam ClassBorderThickness 1.3
+skinparam ArrowColor #2B2B2B
+skinparam PackageBackgroundColor #FFFFFF
+skinparam PackageBorderColor #7A7A7A
+skinparam PackageFontStyle bold
+skinparam NoteBackgroundColor #E6F0FA
+skinparam NoteBorderColor #4A6FA5
+skinparam NoteFontSize 11
+
+package "controller  (capa de presentación)" {
+  class PrestamoController <<RestController>> {
+    - prestamoService: PrestamoService
+    --
+    + registrar(request: PrestamoRequest): ResponseEntity<PrestamoResponse>
+    + listar(): ResponseEntity<List<PrestamoResponse>>
+  }
+  class ManejadorExcepciones <<RestControllerAdvice>> {
+    --
+    + manejarNoEncontrado(ex: RuntimeException): ResponseEntity<ErrorRespuesta>
+    + manejarNoDisponible(ex: LibroNoDisponibleException): ResponseEntity<ErrorRespuesta>
+    + manejarValidacion(ex: MethodArgumentNotValidException): ResponseEntity<ErrorRespuesta>
+  }
+}
+
+package "dto  (objetos de transferencia)" {
+  class PrestamoRequest <<DTO>> {
+    - estudianteId: Long {NotNull}
+    - libroId: Long {NotNull}
+    --
+    + getEstudianteId(): Long
+    + getLibroId(): Long
+  }
+  class PrestamoResponse <<DTO>> {
+    - id: Long
+    - estudianteId: Long
+    - libroId: Long
+    - fechaPrestamo: LocalDate
+    --
+    + {static} desde(p: Prestamo): PrestamoResponse
+  }
+  class ErrorRespuesta <<DTO>> {
+    - estado: int
+    - mensaje: String
+  }
+}
+
+package "service  (capa de negocio)" {
+  class PrestamoService <<Service>> {
+    - estudianteRepository: EstudianteRepository
+    - libroRepository: LibroRepository
+    - prestamoRepository: PrestamoRepository
+    --
+    + registrarPrestamo(request: PrestamoRequest): Prestamo  <<@Transactional>>
+    + consultarPrestamos(): List<Prestamo>
+  }
+  class EstudianteNoEncontradoException <<Exception>> {
+    + EstudianteNoEncontradoException(id: Long)
+  }
+  class LibroNoEncontradoException <<Exception>> {
+    + LibroNoEncontradoException(id: Long)
+  }
+  class LibroNoDisponibleException <<Exception>> {
+    + LibroNoDisponibleException(id: Long)
+  }
+}
+
+package "repository  (capa de acceso a datos)" {
+  class PrestamoRepository <<interface>> {
+    + save(p: Prestamo): Prestamo
+    + findAll(): List<Prestamo>
+  }
+  class LibroRepository <<interface>> {
+    + findById(id: Long): Optional<Libro>
+    + save(l: Libro): Libro
+  }
+  class EstudianteRepository <<interface>> {
+    + findById(id: Long): Optional<Estudiante>
+  }
+  class "JpaRepository<T, ID>" as JpaRepository <<interface>> {
+    + findById(id: ID): Optional<T>
+    + findAll(): List<T>
+    + save(entidad: T): T
+  }
+  class SimpleJpaRepository <<class>> {
+    (implementación generada en ejecución por Spring Data)
+  }
+}
+
+package "model  (dominio / entidades JPA)" {
+  class Estudiante <<Entity>> {
+    - id: Long
+    - nombre: String
+    - correo: String
+    --
+    + Estudiante(nombre: String, correo: String)
+    + getId(): Long
+    + getNombre(): String
+    + getCorreo(): String
+  }
+  class Libro <<Entity>> {
+    - id: Long
+    - titulo: String
+    - disponible: boolean
+    --
+    + Libro(titulo: String, disponible: boolean)
+    + getId(): Long
+    + getTitulo(): String
+    + isDisponible(): boolean
+    + marcarPrestado(): void
+  }
+  class Prestamo <<Entity>> {
+    - id: Long
+    - fechaPrestamo: LocalDate
+    - fechaDevolucion: LocalDate [0..1]
+    - estudiante: Estudiante
+    - libro: Libro
+    --
+    + Prestamo(estudiante: Estudiante, libro: Libro, fechaPrestamo: LocalDate)
+    + getId(): Long
+    + getFechaPrestamo(): LocalDate
+    + getFechaDevolucion(): LocalDate
+    + getEstudiante(): Estudiante
+    + getLibro(): Libro
+  }
+}
+
+' ---- Asociaciones del dominio (referencias persistentes entre objetos) ----
+Prestamo "0..*" --> "1" Estudiante : estudiante
+Prestamo "0..*" --> "1" Libro : libro
+
+' ---- Dependencias entre capas: Controller -> Service -> Repository (nunca Controller -> Repository) ----
+PrestamoController ..> PrestamoService
+PrestamoController ..> PrestamoRequest
+PrestamoController ..> PrestamoResponse
+PrestamoService ..> PrestamoRequest
+PrestamoService ..> EstudianteRepository
+PrestamoService ..> LibroRepository
+PrestamoService ..> PrestamoRepository
+PrestamoService ..> EstudianteNoEncontradoException : <<throw>>
+PrestamoService ..> LibroNoEncontradoException : <<throw>>
+PrestamoService ..> LibroNoDisponibleException : <<throw>>
+PrestamoService ..> Prestamo : <<create>>
+PrestamoService ..> Libro
+PrestamoResponse ..> Prestamo
+ManejadorExcepciones ..> ErrorRespuesta
+ManejadorExcepciones ..> LibroNoDisponibleException
+
+' ---- Repositorios tipados sobre entidades ----
+
+' ---- Generalización entre interfaces y realización de la implementación ----
+PrestamoRepository --|> JpaRepository : <<bind>> <Prestamo, Long>
+LibroRepository --|> JpaRepository : <<bind>> <Libro, Long>
+EstudianteRepository --|> JpaRepository : <<bind>> <Estudiante, Long>
+SimpleJpaRepository ..|> JpaRepository
+
+note bottom of PrestamoController
+  **Dependencia, no asociación.** Controller y Service solo
+  colaboran para ejecutar el caso de uso; la instancia la inyecta
+  el contenedor y no forma parte del dominio. **No existe**
+  ninguna flecha Controller → Repository.
+end note
+
+note right of Prestamo
+  **Asociaciones (sin rombos).** Prestamo guarda la referencia
+  (atributo estudiante / libro): Estudiante 1 — 0..* Prestamo,
+  Libro 1 — 0..* Prestamo. Ciclo de vida independiente:
+  un libro tiene muchos préstamos históricos (R5) y solo
+  uno activo, porque disponible = false mientras exista (R1, R3).
+  GestorPrestamos desaparece: su rol pasa a Service + Repository.
+end note
+
+note bottom of SimpleJpaRepository
+  **Realización solo donde corresponde:** las únicas
+  interfaces son JpaRepository y sus tres especializaciones;
+  Spring Data aporta la clase que las realiza.
+end note
+@enduml
